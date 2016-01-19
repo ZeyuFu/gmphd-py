@@ -8,18 +8,19 @@
 # hypothesis density filter," IEEE Transactions on Signal
 # Processing, 54(11):4091--4104, 2006.
 
-import math,numpy
+import math
+import numpy as np
+# from numpy import linalg
 
-from numpy import linalg,random
 
-class filt():
+class Filt:
 
     """
     This class represents the parameters of the GM-PHD filter, and
     the current estimate given all the data observed so far.
     """
 
-    class hypot():
+    class GaussianComponent:
 
         """
         This class represents a single component in the intensity
@@ -29,34 +30,34 @@ class filt():
         weights are not required to sum to one.
         """
 
-        def __init__(self,weight,mean,covar):
+        def __init__(self, weight, mean, covar):
 
             self.weight=weight
             self.mean=mean
             self.covar=covar
 
-        def div(self,*other):
-
-            """
-            Evaluate the Kullback-Leibler (KL) divergence with
-            respect to other mixture components.
-            """
-
-            # Pre-compute the Cholesky factor of the
-            # covariance, and its log-determinant.
-            cholfact=linalg.cholesky(self.covar)
-            logdet=numpy.log(cholfact.diagonal()).sum()
-
-            div=[]
-
-            # Evaluate the Kullback-Leibler divergence.
-            for hypot in other:
-                aux=linalg.cholesky(hypot.covar)
-                div.append(numpy.sum(numpy.abs(linalg.solve(cholfact,aux))**2)/2.0
-                           +numpy.sum(numpy.abs(linalg.solve(cholfact,self.mean-hypot.mean))**2)/2.0
-                           +logdet-numpy.log(aux.diagonal()).sum()-float(self.mean.size)/2.0)
-
-            return div
+        # def kl_divergence(self,*other):
+        #
+        #     """
+        #     Evaluate the Kullback-Leibler (KL) divergence with
+        #     respect to other mixture components.
+        #     """
+        #
+        #     # Pre-compute the Cholesky factor of the
+        #     # covariance, and its log-determinant.
+        #     cholfact = linalg.cholesky(self.covar)
+        #     logdet = np.log(cholfact.diagonal()).sum()
+        #
+        #     div=[]
+        #
+        #     # Evaluate the Kullback-Leibler divergence.
+        #     for hypot in other:
+        #         aux=linalg.cholesky(hypot.covar)
+        #         div.append(numpy.sum(numpy.abs(linalg.solve(cholfact,aux))**2)/2.0
+        #                    +numpy.sum(numpy.abs(linalg.solve(cholfact,self.mean-hypot.mean))**2)/2.0
+        #                    +logdet-numpy.log(aux.diagonal()).sum()-float(self.mean.size)/2.0)
+        #
+        #     return div
 
         def merge(self,*other):
 
@@ -81,7 +82,7 @@ class filt():
                 self.covar+=hypot.weight*numpy.outer(diff,diff)
                 self.covar/=self.weight
 
-    def __init__(self,initweight,initmean,initcovar,transgain,transnoise,measgain,measnoise,
+    def __init__(self, init_weight, init_mean, init_covar, transgain,transnoise,measgain,measnoise,
                  clutterdens=lambda x:0.0,birthrate=0.0,clutterrate=0.0,survprob=1.0,detecprob=1.0):
 
         """
