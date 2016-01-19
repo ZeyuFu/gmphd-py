@@ -1,30 +1,15 @@
-                   ======================================
-                                   gmphd
-                   GM-PHD filter implementation in python
-                              by Dan Stowell
-                   ======================================
+# GM-PHD Filter
 
-This is a Python implementation of the Gaussian mixture PHD filter
-(probability hypothesis density filter) described in:
+This is a Python implementation of the Gaussian Mixture - Probability Hypothesis Density (GM-PHD)
+filter described in:
 
-B. N. Vo and W. K. Ma. The gaussian mixture probability hypothesis density filter. 
+B. N. Vo and W. K. Ma. The Gaussian Mixture Probability Hypothesis Density Filter.
    IEEE Transactions on Signal Processing, 54(11):4091--4104, 2006.
    DOI: 10.1109/TSP.2006.881190
 
-It requires Numpy, and the demo scripts require matplotlib.
+It requires Numpy and Scipy the demo scripts require matplotlib.
 Tested with Python 2.7.
 
-This implementation was developed as part of the following research:
-
-D. Stowell and M. D. Plumbley, Multi-target pitch tracking of vibrato sources in
-   noise using the GM-PHD filter. In: Proceedings of Proceedings of the 5th
-   International Workshop on Machine Learning and Music (MML12), July 2012.
-   http://c4dm.eecs.qmul.ac.uk/papers/2012/StowellPlumbley2012mml.pdf
-
-The figures in that paper were produced by running the following commands:
-
-* Fig 1: `python syntheticexample.py`
-* Fig 2: `python syntheticroc.py`
 
 DIFFERENCES FROM VO & MA
 ========================
@@ -61,7 +46,7 @@ g.gmmplot1d()
 LICENCE
 =======
 
-(c) 2012 Dan Stowell and Queen Mary University of London.
+(c) 2016 Tommaso Fabbri and Department of Information Engineering  - Automation &  .
 All rights reserved.
 
     gmphd is free software: you can redistribute it and/or modify
