@@ -1,6 +1,7 @@
 import numpy as np
 from operator import itemgetter, attrgetter
 from scipy.stats import multivariate_normal
+import math
 
 # !/usr/bin/env python
 # GM-PHD implementation  in Python by Dan Stowell modified by Tommaso Fabbri
@@ -43,17 +44,28 @@ class GmphdComponent:
     """
 
     def __init__(self, weight, mean, cov):
+
         self.weight = np.float64(weight)
+        self.mean = np.array(mean, dtype=np.float64)
+        self.cov = np.array(cov, dtype=np.float64)
 
-        self.mean = np.array(mean, dtype=np.float64, ndmin=2)
-        self.cov = np.array(cov, dtype=np.float64, ndmin=2)
+        print self.mean.size
 
-        self.mean = np.reshape(self.mean, (self.mean.size, 1))
-        self.cov = np.reshape(self.cov, (self.mean.size, self.mean.size))
+        # self.mean.resize((self.mean.size, 1))
+        # self.cov.resize((self.mean.size, self.mean.size))
 
+    def __repr__(self):
+        # return 'PUPPA'
+        str = '\tWeight: {0}\n\tMean: {1}\n\tCovariance: {2}\n'.format(self.weight, self.mean, self.cov)
+        return str
 
 class GMPHD:
     birth_w = 0.001
+
+    def __str__(self):
+
+        for i in self.gm:
+            return i.__str__()
 
     def __init__(self, birthgmm, survival, detection, f, q, h, r, clutter):
         """
@@ -78,11 +90,8 @@ class GMPHD:
         self.q = np.array(q, dtype=np.float64)  # process noise covariance     (Q_k-1 in paper)
         self.h = np.array(h, dtype=np.float64)  # observation matrix           (H_k in paper)
         self.r = np.array(r, dtype=np.float64)  # observation noise covariance (R_k in paper)
-        self.clutter = np.float64(clutter)  # clutter intensity (KAU in paper)
 
-    def create_birth(self, measures):
-        born = [GmphdComponent(GMPHD.birth_w, m, self.r) for m in measures]
-        return born
+        self.clutter = np.float64(clutter)  # clutter intensity (KAU in paper)
 
     def predict_birth(self, born_components):
         # Prediction for birth targets
@@ -129,29 +138,34 @@ class GMPHD:
 
             # The Kappa thing (clutter and reweight)
             weight_sum = np.sum(comp.weight for comp in temp_gm)
-            weight_factor = 1.0 / (self.clutter + weight_sum)
-            for comp in temp_gm:
-                comp.weight *= weight_factor
-            pr_gm.extend(temp_gm)
+            if weight_sum != 0:
+                weight_factor = 1.0 / (self.clutter + weight_sum)
+                for comp in temp_gm:
+                    comp.weight *= weight_factor
+                pr_gm.extend(temp_gm)
         self.gm = pr_gm
 
     def run_iteration(self, measures, born_components):
         # Prediction for birthed targets
+        print('Measures: '.format(measures))
         pr_born = self.predict_birth(born_components)
         # Prediction for existing targets
         predicted = self.predict_existing()
         predicted.extend(pr_born)
+        print('Predicted components:'.format(predicted))
         # Update
         self.update(measures, predicted)
+        print('Updated components:'.format(self.gm))
         # Prune
         self.prune()
+        print('Pruning: '.format(self.gm))
 
     def prune(self, truncation_thresh=1e-6, merge_thresh=0.01, max_components=100):
         temp_sum_0 = np.sum([i.weight for i in self.gm])
 
         # Truncation step
         I = filter(lambda comp: comp.weight > truncation_thresh, self.gm)
-        l = 0 # count the number of features/components
+        l = 0  # count the number of features/components
         pruned_gm = []
 
         # Merge step
@@ -167,10 +181,10 @@ class GMPHD:
                     L.append(i)
                     indexes.append(index)
             temp_weight = np.sum([i.weight for i in L])
-            temp_mean = (1.0 / temp_weight) * np.sum([i.weight*i.mean for i in L])
+            temp_mean = (1.0 / temp_weight) * np.sum([i.weight * i.mean for i in L])
             temp_cov = np.zeros((temp_mean.size, temp_mean.size))
             for i in L:
-                temp_cov += (i.cov + np.dot((temp_mean - i.mean),(temp_mean - i.mean).T))
+                temp_cov += (i.cov + np.dot((temp_mean - i.mean), (temp_mean - i.mean).T))
             pruned_gm.append(GmphdComponent(temp_weight, temp_mean, temp_cov))
             I = [i for j, i in enumerate(I) if j not in indexes]
         pruned_gm.sort(key=attrgetter('weight'))
@@ -181,3 +195,11 @@ class GMPHD:
             i.weight *= temp_sum_0 / temp_sum_1
 
         self.gm = pruned_gm
+
+
+def create_birth(measures):
+    sigma_r = 2.0/3
+    R = [[math.pow(2*sigma_r, 2), 0], [0, math.pow(2*sigma_r, 2)]]
+    born = [GmphdComponent(GMPHD.birth_w, m, R) for m in measures]
+    print born
+    return born

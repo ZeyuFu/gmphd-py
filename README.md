@@ -7,7 +7,7 @@ B. N. Vo and W. K. Ma. The Gaussian Mixture Probability Hypothesis Density Filte
    IEEE Transactions on Signal Processing, 54(11):4091--4104, 2006.
    DOI: 10.1109/TSP.2006.881190
 
-## Dependencies
+### Dependencies
 
 - Numpy
 - Scipy
@@ -15,23 +15,24 @@ B. N. Vo and W. K. Ma. The Gaussian Mixture Probability Hypothesis Density Filte
 The test file *gmphd-moos* requires python-moos
 Tested with Python 2.7.
 
-
-## Notes
+### Notes
 
 There are some differences from the GM-PHD algorithm described in Vo & Ma's paper:
 
-* I have not implemented "spawning" of new targets from old ones, since I don't 
+- I have not implemented "spawning" of new targets from old ones, since I don't 
   need it. It would be straightforward to add it - see the original paper.
 
-* Weights are adjusted at the end of pruning, so that pruning doesn't affect
+- Weights are adjusted at the end of pruning, so that pruning doesn't affect
   the total weight allocation.
 
-* I provide an alternative approach to state-extraction (an alternative to
+- I provide an alternative approach to state-extraction (an alternative to
   Table 3 in the original paper) which makes use of the integral to decide how
   many states to extract.
 
+### MOOSApp
 
-## License
+
+### License
 
 gmphd-py is a python implementation of the Gaussian Mixture - Probability Hypothesis Density (GM-PHD) filter.
 Copyright (C) 2016  Tommaso Fabbri - University of Pisa - Automation and Robotics Laboratory
