@@ -30,6 +30,7 @@ def on_mail():
                                                    g.group('label'), g.group('type')))
             if g.group('type') == 'hazard':
                 measure = np.array([np.float64(g.group('x')), np.float64(g.group('y'))])
+                measure.shape = (measure.size, 1)
                 print(measure)
                 on_measures(measure)
     return True
@@ -39,9 +40,11 @@ def on_measures(measure):
     # Measures is an array of [x, y] of possible
     # TODO Implement the call to the filter
     global f_gmphd, born_components
+    print(measure)
+    f_gmphd.run_iteration(measure, born_components)
+    # f_gmphd = f_gmphd.run_iteration(measure, born_components)
 
-    f_gmphd = f_gmphd.run_iteration(measure, born_components)
-    born_components = gmphd.create_birth(measures)
+    born_components = gmphd.create_birth(measure)
     print('Born components: '.format(born_components))
 
 

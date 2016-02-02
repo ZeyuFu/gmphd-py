@@ -55,7 +55,6 @@ class GmphdComponent:
         # self.cov.resize((self.mean.size, self.mean.size))
 
     def __repr__(self):
-        # return 'PUPPA'
         str = '\tWeight: {0}\n\tMean: {1}\n\tCovariance: {2}\n'.format(self.weight, self.mean, self.cov)
         return str
 
@@ -111,7 +110,10 @@ class GMPHD:
 
     def update(self, measures, predicted):
         # Construction of PHD update components
+        repr(predicted)
+
         eta = [np.dot(self.h, comp.mean) for comp in predicted]
+        print 'Eta',  eta
         s = [self.r + np.dot(np.dot(self.h, comp.cov), self.h.T) for comp in predicted]
 
         k = []
@@ -120,7 +122,7 @@ class GMPHD:
 
         pkk = []
         for index, comp in enumerate(predicted):
-            pkk.append(np.dot(np.eye(np.size(k[index])) - np.dot(k[index], self.h), comp.cov))
+            pkk.append(np.dot(np.eye(np.shape(k[index])[0]) - np.dot(k[index], self.h), comp.cov))
 
         # Update using the measures
 
@@ -128,11 +130,17 @@ class GMPHD:
         pr_gm = [GmphdComponent(comp.weight * (1.0 - self.detection),
                                 comp.mean, comp.cov) for comp in predicted]
 
-        for z in measures:
+        for i in np.ndindex(measures.shape[1]):
+            z = measures[:, i]
             temp_gm = []
             for j, comp in enumerate(predicted):
+                print "Z", z.squeeze()
+                print 'ETA', eta[j].squeeze()
+                print 'S', s[j]
+                mvn = multivariate_normal(eta[j].squeeze(), s[j])
+                mvn_result = mvn.pdf(z.squeeze())
                 temp_gm.append(GmphdComponent(
-                        self.detection * comp.weight * multivariate_normal(z, eta[j], s[j]),
+                        self.detection * comp.weight * mvn_result,
                         comp.mean + np.dot(k[j], z - eta[j]),
                         comp.cov))
 
@@ -147,7 +155,8 @@ class GMPHD:
 
     def run_iteration(self, measures, born_components):
         # Prediction for birthed targets
-        print('Measures: '.format(measures))
+        print('Measures: ')
+        print(measures)
         pr_born = self.predict_birth(born_components)
         # Prediction for existing targets
         predicted = self.predict_existing()
@@ -175,16 +184,19 @@ class GMPHD:
             L = []
             indexes = []
             for index, i in enumerate(I):
-                temp = np.dot((i.mean - I[j].mean).T, np.inv(i.cov))
+                temp = np.dot((i.mean - I[j].mean).T, np.linalg.inv(i.cov))
                 mah_dist = np.float64(np.dot(temp, (i.mean - I[j].mean)))
                 if mah_dist <= merge_thresh:
                     L.append(i)
                     indexes.append(index)
             temp_weight = np.sum([i.weight for i in L])
-            temp_mean = (1.0 / temp_weight) * np.sum([i.weight * i.mean for i in L])
+            temp_mean = (1.0 / temp_weight) * np.sum([i.weight * i.mean for i in L], axis=0)
             temp_cov = np.zeros((temp_mean.size, temp_mean.size))
+
             for i in L:
-                temp_cov += (i.cov + np.dot((temp_mean - i.mean), (temp_mean - i.mean).T))
+                print 'TM', temp_mean
+                print i.mean
+                temp_cov += (i.cov + np.dot((temp_mean - i.mean).T, (temp_mean - i.mean)))
             pruned_gm.append(GmphdComponent(temp_weight, temp_mean, temp_cov))
             I = [i for j, i in enumerate(I) if j not in indexes]
         pruned_gm.sort(key=attrgetter('weight'))
@@ -200,6 +212,9 @@ class GMPHD:
 def create_birth(measures):
     sigma_r = 2.0/3
     R = [[math.pow(2*sigma_r, 2), 0], [0, math.pow(2*sigma_r, 2)]]
-    born = [GmphdComponent(GMPHD.birth_w, m, R) for m in measures]
-    print born
+
+    it = np.nditer(measures.shape[1])
+    born = []
+    for i in np.ndindex(measures.shape[1]):
+        born.append(GmphdComponent(GMPHD.birth_w, measures[:,i], R))
     return born
