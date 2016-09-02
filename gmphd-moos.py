@@ -31,7 +31,6 @@ def on_mail():
             if g.group('type') == 'hazard':
                 measure = np.array([np.float64(g.group('x')), np.float64(g.group('y'))])
                 measure.shape = (measure.size, 1)
-                print(measure)
                 on_measures(measure)
     return True
 
@@ -43,9 +42,8 @@ def on_measures(measure):
     print(measure)
     f_gmphd.run_iteration(measure, born_components)
     # f_gmphd = f_gmphd.run_iteration(measure, born_components)
-
     born_components = gmphd.create_birth(measure)
-    print('Born components: '.format(born_components))
+    print('Born components: {0}'.format(born_components))
 
 
 def main():
@@ -55,11 +53,12 @@ def main():
     # TODO Implement a configuration file *.csv for speed up the simulations and settings
 
     F = [[1, 0], [0, 1]]
-    sigma_q = 1e-3
-    Q = [[math.pow(sigma_q, 2), 0], [0, math.pow(sigma_q, 2)]]
-
     H = [[1, 0], [0, 1]]
+
+    sigma_q = 1e-3
     sigma_r = 2.0/3
+
+    Q = [[math.pow(sigma_q, 2), 0], [0, math.pow(sigma_q, 2)]]
     R = [[math.pow(2*sigma_r, 2), 0], [0, math.pow(2*sigma_r, 2)]]
 
     p_d = 0.95
@@ -82,5 +81,5 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt as e:
-        print("\n\tGMPHD-MOOS terminated")
+        print("\nGMPHD-MOOS terminated")
         pass

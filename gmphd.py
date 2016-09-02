@@ -32,31 +32,34 @@ This file is part of gmphd, GM-PHD filter in python by Dan Stowell.
     along with gmphd.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+np.set_printoptions(precision=3)
+
 
 class GmphdComponent:
     """
     GM-PHD Gaussian component.
 
     The Gaussian component is defined by:
-        weight
-        mean
-        covariance
+        _weight
+        _mean
+        _covariance
     """
 
     def __init__(self, weight, mean, cov):
 
-        self.weight = np.float64(weight)
-        self.mean = np.array(mean, dtype=np.float64)
-        self.cov = np.array(cov, dtype=np.float64)
+        self._weight = np.float64(weight)
+        self._mean = np.array(mean, dtype=np.float64)
+        self._cov = np.array(cov, dtype=np.float64)
 
-        print self.mean.size
+        print self._mean.size
 
         # self.mean.resize((self.mean.size, 1))
         # self.cov.resize((self.mean.size, self.mean.size))
 
     def __repr__(self):
-        str = '\tWeight: {0}\n\tMean: {1}\n\tCovariance: {2}\n'.format(self.weight, self.mean, self.cov)
-        return str
+        str_ = '\nW:\n{0}\nM:\n{1}\nC:\n{2}\n'.format(self._weight, self._mean, self._cov)
+        return str_
+
 
 class GMPHD:
     birth_w = 0.001
@@ -94,17 +97,17 @@ class GMPHD:
 
     def predict_birth(self, born_components):
         # Prediction for birth targets
-        born = [GmphdComponent(comp.weight,
-                               np.dot(self.f, comp.mean),
-                               self.q + np.dot(np.dot(self.f, comp.cov), self.f.T)
+        born = [GmphdComponent(comp._weight,
+                               np.dot(self.f, comp._mean),
+                               self.q + np.dot(np.dot(self.f, comp._cov), self.f.T)
                                ) for comp in born_components]
         return born
 
     def predict_existing(self):
         # Prediction for existing targets
-        predicted = [GmphdComponent(self.survival * comp.weight,
-                                    np.dot(self.f, comp.mean),
-                                    self.q + np.dot(np.dot(self.f, comp.cov), self.f.T)
+        predicted = [GmphdComponent(self.survival * comp._weight,
+                                    np.dot(self.f, comp._mean),
+                                    self.q + np.dot(np.dot(self.f, comp._cov), self.f.T)
                                     ) for comp in self.gm]
         return predicted
 
@@ -112,23 +115,23 @@ class GMPHD:
         # Construction of PHD update components
         repr(predicted)
 
-        eta = [np.dot(self.h, comp.mean) for comp in predicted]
+        eta = [np.dot(self.h, comp._mean) for comp in predicted]
         print 'Eta',  eta
-        s = [self.r + np.dot(np.dot(self.h, comp.cov), self.h.T) for comp in predicted]
+        s = [self.r + np.dot(np.dot(self.h, comp._cov), self.h.T) for comp in predicted]
 
         k = []
         for index, comp in enumerate(predicted):
-            k.append(np.dot(np.dot(comp.cov, self.h.T), np.linalg.inv(s[index])))
+            k.append(np.dot(np.dot(comp._cov, self.h.T), np.linalg.inv(s[index])))
 
         pkk = []
         for index, comp in enumerate(predicted):
-            pkk.append(np.dot(np.eye(np.shape(k[index])[0]) - np.dot(k[index], self.h), comp.cov))
+            pkk.append(np.dot(np.eye(np.shape(k[index])[0]) - np.dot(k[index], self.h), comp._cov))
 
         # Update using the measures
 
         # The 'predicted' components are kept, with a decay
-        pr_gm = [GmphdComponent(comp.weight * (1.0 - self.detection),
-                                comp.mean, comp.cov) for comp in predicted]
+        pr_gm = [GmphdComponent(comp._weight * (1.0 - self.detection),
+                                comp._mean, comp._cov) for comp in predicted]
 
         for i in np.ndindex(measures.shape[1]):
             z = measures[:, i]
@@ -140,16 +143,16 @@ class GMPHD:
                 mvn = multivariate_normal(eta[j].squeeze(), s[j])
                 mvn_result = mvn.pdf(z.squeeze())
                 temp_gm.append(GmphdComponent(
-                        self.detection * comp.weight * mvn_result,
-                        comp.mean + np.dot(k[j], z - eta[j]),
-                        comp.cov))
+                        self.detection * comp._weight * mvn_result,
+                        comp._mean + np.dot(k[j], z - eta[j]),
+                        comp._cov))
 
             # The Kappa thing (clutter and reweight)
-            weight_sum = np.sum(comp.weight for comp in temp_gm)
+            weight_sum = np.sum(comp._weight for comp in temp_gm)
             if weight_sum != 0:
                 weight_factor = 1.0 / (self.clutter + weight_sum)
                 for comp in temp_gm:
-                    comp.weight *= weight_factor
+                    comp._weight *= weight_factor
                 pr_gm.extend(temp_gm)
         self.gm = pr_gm
 
@@ -170,41 +173,41 @@ class GMPHD:
         print('Pruning: '.format(self.gm))
 
     def prune(self, truncation_thresh=1e-6, merge_thresh=0.01, max_components=100):
-        temp_sum_0 = np.sum([i.weight for i in self.gm])
+        temp_sum_0 = np.sum([i._weight for i in self.gm])
 
         # Truncation step
-        I = filter(lambda comp: comp.weight > truncation_thresh, self.gm)
+        I = filter(lambda comp: comp._weight > truncation_thresh, self.gm)
         l = 0  # count the number of features/components
         pruned_gm = []
 
         # Merge step
         while len(I) > 0:
             l += 1
-            j = np.argmax(i.weight for i in I)
+            j = np.argmax(i._weight for i in I)
             L = []
             indexes = []
             for index, i in enumerate(I):
-                temp = np.dot((i.mean - I[j].mean).T, np.linalg.inv(i.cov))
-                mah_dist = np.float64(np.dot(temp, (i.mean - I[j].mean)))
+                temp = np.dot((i._mean - I[j]._mean).T, np.linalg.inv(i._cov))
+                mah_dist = np.float64(np.dot(temp, (i._mean - I[j]._mean)))
                 if mah_dist <= merge_thresh:
                     L.append(i)
                     indexes.append(index)
-            temp_weight = np.sum([i.weight for i in L])
-            temp_mean = (1.0 / temp_weight) * np.sum([i.weight * i.mean for i in L], axis=0)
+            temp_weight = np.sum([i._weight for i in L])
+            temp_mean = (1.0 / temp_weight) * np.sum([i._weight * i._mean for i in L], axis=0)
             temp_cov = np.zeros((temp_mean.size, temp_mean.size))
 
             for i in L:
                 print 'TM', temp_mean
-                print i.mean
-                temp_cov += (i.cov + np.dot((temp_mean - i.mean).T, (temp_mean - i.mean)))
+                print i._mean
+                temp_cov += (i._cov + np.dot((temp_mean - i._mean).T, (temp_mean - i._mean)))
             pruned_gm.append(GmphdComponent(temp_weight, temp_mean, temp_cov))
             I = [i for j, i in enumerate(I) if j not in indexes]
-        pruned_gm.sort(key=attrgetter('weight'))
+        pruned_gm.sort(key=attrgetter('_weight'))
         pruned_gm.reverse()
         pruned_gm = pruned_gm[:max_components]
-        temp_sum_1 = np.sum(i.weight for i in pruned_gm)
+        temp_sum_1 = np.sum(i._weight for i in pruned_gm)
         for i in pruned_gm:
-            i.weight *= temp_sum_0 / temp_sum_1
+            i._weight *= temp_sum_0 / temp_sum_1
 
         self.gm = pruned_gm
 

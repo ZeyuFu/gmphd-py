@@ -1,0 +1,8 @@
+{
+  "Filter" : {
+    "sigma_q" : 0.001,
+    "sigma_r" : 0.666,
+     "prob_d" : 0.9,
+     "prob_s" : 1.0
+  }
+}
