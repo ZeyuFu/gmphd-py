@@ -27,13 +27,12 @@ def evaluate_sss_path(nav_status, width, length):
     width -- swath width of the side-scan sonar
     length -- swath length of the side-scan sonar
     """
-    vertexes = np.array([[nav_status[0] + width/2, nav_status[1] + length/2], # UR Vertex
-                         [nav_status[0] - width/2, nav_status[1] + length/2], # UL Vertex
-                         [nav_status[0] - width/2, nav_status[1] - length/2], # BL Vertex
-                         [nav_status[0] + width/2, nav_status[1] - length/2]   # BR Vertex
+    vertexes = np.array([[ + width/2, + length/2],  # UR Vertex
+                         [ - width/2, + length/2],  # UL Vertex
+                         [ - width/2, - length/2],  # BL Vertex
+                         [ + width/2, - length/2]   # BR Vertex
                        ])
     r_vertexes = np.apply_along_axis(rotate2D, 1, vertexes, nav_status[2])
-    print vertexes
+    r_vertexes = r_vertexes + [nav_status[0], nav_status[1]]
     print vertexes.shape
-    print r_vertexes
     return mplPath.Path(r_vertexes)
