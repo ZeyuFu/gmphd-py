@@ -2,9 +2,10 @@ import numpy as np
 from operator import itemgetter, attrgetter
 from scipy.stats import multivariate_normal
 import math
+from matplotlib import path
 
-# !/usr/bin/env python
-# GM-PHD implementation  in Python by Dan Stowell modified by Tommaso Fabbri
+#!/usr/bin/env python
+# GM-PHD implementation in Python by Dan Stowell modified by Tommaso Fabbri
 #
 # Based on the description in Vo and Ma (2006).
 # (c) 2012 Dan Stowell and Queen Mary University of London.
@@ -15,7 +16,6 @@ import math
 # NOTE: SPAWNING IS NOT IMPLEMENTED.
 
 """
-
 This file is part of gmphd, GM-PHD filter in python by Dan Stowell.
 
     gmphd is free software: you can redistribute it and/or modify
@@ -50,9 +50,6 @@ class GmphdComponent:
         self._weight = np.float64(weight)
         self._mean = np.array(mean, dtype=np.float64)
         self._cov = np.array(cov, dtype=np.float64)
-
-        print self._mean.size
-
         # self.mean.resize((self.mean.size, 1))
         # self.cov.resize((self.mean.size, self.mean.size))
 
@@ -72,7 +69,6 @@ class GMPHD:
     def __init__(self, birthgmm, survival, detection, f, q, h, r, clutter):
         """
             'gm' list of GmphdComponent
-
             'birthgmm' List of GmphdComponent items which makes up the GMM of birth probabilities.
             'survival' Survival probability.
             'detection' Detection probability.
@@ -93,7 +89,13 @@ class GMPHD:
         self.h = np.array(h, dtype=np.float64)  # observation matrix           (H_k in paper)
         self.r = np.array(r, dtype=np.float64)  # observation noise covariance (R_k in paper)
 
-        self.clutter = np.float64(clutter)  # clutter intensity (KAU in paper)
+        self.clutter = np.float64(clutter)  # clutter intensity
+        self.swath_width = np.float64(50)   # uFldSensor Swath Width
+        self.swath_length = np.float64(4)   # uFldSensor Swath Length
+
+    def update_ufldsensor_data(self, width, length):
+        self.swath_width = width
+        self.swath_length = length
 
     def predict_birth(self, born_components):
         # Prediction for birth targets
@@ -111,12 +113,12 @@ class GMPHD:
                                     ) for comp in self.gm]
         return predicted
 
-    def update(self, measures, predicted):
+    def auv_update(self, measures, predicted, auv_x, auv_y, auv_heading):
         # Construction of PHD update components
         repr(predicted)
 
         eta = [np.dot(self.h, comp._mean) for comp in predicted]
-        print 'Eta',  eta
+        # print 'Eta',  eta
         s = [self.r + np.dot(np.dot(self.h, comp._cov), self.h.T) for comp in predicted]
 
         k = []
@@ -129,19 +131,22 @@ class GMPHD:
 
         # Update using the measures
 
-        # The 'predicted' components are kept, with a decay
-        pr_gm = [GmphdComponent(comp._weight * (1.0 - self.detection),
+        # The 'predicted' components are kept, with a decay on the weight iff they are inside the FOV
+
+        pr_gm = [ GmphdComponent(comp._weight * (1.0 - self.detection),
                                 comp._mean, comp._cov) for comp in predicted]
 
         for i in np.ndindex(measures.shape[1]):
             z = measures[:, i]
             temp_gm = []
             for j, comp in enumerate(predicted):
-                print "Z", z.squeeze()
-                print 'ETA', eta[j].squeeze()
-                print 'S', s[j]
+                # print "Z", z.squeeze()
+                # print 'ETA', eta[j].squeeze()
+                # print 'S', s[j]
                 mvn = multivariate_normal(eta[j].squeeze(), s[j])
+
                 mvn_result = mvn.pdf(z.squeeze())
+
                 temp_gm.append(GmphdComponent(
                         self.detection * comp._weight * mvn_result,
                         comp._mean + np.dot(k[j], z - eta[j]),
@@ -171,6 +176,17 @@ class GMPHD:
         # Prune
         self.prune()
         print('Pruning: '.format(self.gm))
+
+    def run_auv_iteration(self, measures, born_components, auv_x, auv_y, swath_w, swath_l):
+        pr_born = self.predict_birth(born_components)
+
+        predicted = self.predict_existing()
+        predicted.extend(pr_born)
+
+        self.update(measures, predicted)
+
+        self.prune()
+
 
     def prune(self, truncation_thresh=1e-6, merge_thresh=0.01, max_components=100):
         temp_sum_0 = np.sum([i._weight for i in self.gm])
@@ -211,6 +227,8 @@ class GMPHD:
 
         self.gm = pruned_gm
 
+    def inside_fov(self, auv_x, auv_y, auv_heading):
+
 
 def create_birth(measures):
     sigma_r = 2.0/3
@@ -221,3 +239,4 @@ def create_birth(measures):
     for i in np.ndindex(measures.shape[1]):
         born.append(GmphdComponent(GMPHD.birth_w, measures[:,i], R))
     return born
+

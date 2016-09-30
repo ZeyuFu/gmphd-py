@@ -1,19 +1,35 @@
 # GMPHD-py
 
-This is a Python implementation of the Gaussian Mixture - Probability Hypothesis Density (GM-PHD)
-filter described in:
+This repository contains a Python implementation of the Gaussian Mixture - 
+Probability Hypothesis Density (GM-PHD) filter described in [1] (forked from 
+the [Dan Stowell repository](https://github.com/danstowell/gmphd)) and its 
+application to underwater robotic mapping [2]. 
 
-B. N. Vo and W. K. Ma. The Gaussian Mixture Probability Hypothesis Density Filter.
-   IEEE Transactions on Signal Processing, 54(11):4091--4104, 2006.
-   DOI: 10.1109/TSP.2006.881190
+#### References
+
+[1] B. N. Vo and W. K. Ma. *The Gaussian Mixture Probability Hypothesis Density Filter*
+   IEEE Transactions on Signal Processing, 2006.
+
+[2] T. Fabbri, F. Di Corato, D. Fenucci, D. Meucci and A. Caiti, 
+*Multiple target tracking in seabed surveys using the GM-PHD filter* 
+OCEANS 2015 - MTS/IEEE Washington, Washington, DC, 2015
+
+[3] Stowell and M. D. Plumbley, *Multi-target pitch tracking of vibrato sources in
+   noise using the GM-PHD filter*  In Proceedings of Proceedings of the 5th
+   International Workshop on Machine Learning and Music, July 2012.
 
 ### Dependencies
+
+GM-PHD Filter dependencies [3]:
 
 - Numpy
 - Scipy
 
-The test file *gmphd-moos* requires python-moos
-Tested with Python 2.7.
+Dependencies for the application of underwater robotic mapping [2]:
+
+- MOOS
+- MOOS-IVP
+- Python-moos
 
 ### Notes
 
@@ -34,10 +50,9 @@ There are some differences from the GM-PHD algorithm described in Vo & Ma's pape
 
 ### License
 
-gmphd-py is a python implementation of the Gaussian Mixture - Probability Hypothesis Density (GM-PHD) filter.
-Copyright (C) 2016  Tommaso Fabbri - University of Pisa - Automation and Robotics Laboratory
+(C) 2016  Tommaso Fabbri - University of Pisa - Automation and Robotics Laboratory
 
-This program is free software: you can redistribute it and/or modify
+This code represents free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.

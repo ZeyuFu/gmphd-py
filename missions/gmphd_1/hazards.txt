@@ -1,5 +1,5 @@
 // gen_hazards --polygon=-150,-75:-150,-400:400,-400:400,-75 --objects=5,hazard --objects=10,benign
-region = pts={-150,-75:-150,-400:400,-400:400,-75}
+region = pts={-150,-50:-150,-400:400,-400:400,-50}
 hazard = x=-52,y=-290,label=75,type=hazard
 hazard = x=41,y=-108,label=53,type=hazard
 hazard = x=-64,y=-124,label=98,type=hazard

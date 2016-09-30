@@ -1,26 +1,33 @@
 #!/usr/bin/python
 
 import pymoos
+import json
 import time
 import math
 import re
 import numpy as np
 import gmphd
+import utils
 
 comms = None
 f_gmphd = None
 born_components = None
-
+auv_nav_status = np.ndarray([0,0,0], dtype=np.float64) # [x, y, yaw]
+m _regex = re.compile('x=(?P<x>[-+]?(\d*[.])?\d+e?[-+]?\d*),'
+                      'y=(?P<y>[-+]?(\d*[.])?\d+e?[-+]?\d*),label=(?P<label>\d*),'
+                      'type=(?P<type>benign|hazard)')
+ 
 
 def on_connect():
     global comms
-    return comms.register('UHZ_HAZARD_REPORT', 0)
-
+    comms.register('NAV_X'            , 0)
+    comms.register('NAV_Y'            , 0)
+    comms.register('NAV_YAW'          , 0)
+    comms.register('UHZ_HAZARD_REPORT', 0)
+    return True
 
 def on_mail():
-    m_regex = re.compile('x=(?P<x>[-+]?(\d*[.])?\d+e?[-+]?\d*),'
-                         'y=(?P<y>[-+]?(\d*[.])?\d+e?[-+]?\d*),label=(?P<label>\d*),'
-                         'type=(?P<type>benign|hazard)')
+    global auv_nav_status
 
     msgs = comms.fetch()
     for i in reversed(range(len(msgs))):
@@ -32,6 +39,16 @@ def on_mail():
                 measure = np.array([np.float64(g.group('x')), np.float64(g.group('y'))])
                 measure.shape = (measure.size, 1)
                 on_measures(measure)
+        if msgs[i].name() == 'NAV_X':
+            nav_x = np.float64(msgs[i].string())
+            auv_nav_status[0] = nav_x
+        if msgs[i].name() == 'NAV_Y':
+            nav_y = np.float64(msgs[i].string())
+            auv_nav_status[1] = nav_y
+        if msgs[i].name() == 'NAV_YAW':
+            nav_yaw = np.float64(msgs[i].string())
+            auv_nav_status[2] = nav_yaw
+
     return True
 
 
@@ -39,30 +56,30 @@ def on_measures(measure):
     # Measures is an array of [x, y] of possible
     # TODO Implement the call to the filter
     global f_gmphd, born_components
-    print(measure)
+
     f_gmphd.run_iteration(measure, born_components)
+    # TODO Feature all'interno del FOV hanno una evoluzione differente
     # f_gmphd = f_gmphd.run_iteration(measure, born_components)
+
     born_components = gmphd.create_birth(measure)
     print('Born components: {0}'.format(born_components))
 
 
-def main():
+def main(_sigma_q, _sigma_r, _p_d, _p_s):
     global comms, f_gmphd, born_components
     comms = pymoos.comms()
-
-    # TODO Implement a configuration file *.csv for speed up the simulations and settings
 
     F = [[1, 0], [0, 1]]
     H = [[1, 0], [0, 1]]
 
-    sigma_q = 1e-3
-    sigma_r = 2.0/3
+    sigma_q = _sigma_q
+    sigma_r = _sigma_r
 
     Q = [[math.pow(sigma_q, 2), 0], [0, math.pow(sigma_q, 2)]]
     R = [[math.pow(2*sigma_r, 2), 0], [0, math.pow(2*sigma_r, 2)]]
 
-    p_d = 0.95
-    p_s = 1.00
+    p_d = _p_d
+    p_s = _p_s
 
     clutter_intensity = 0
 
@@ -78,8 +95,15 @@ def main():
         time.sleep(1.0)
 
 if __name__ == "__main__":
+    with open('filter-conf.json') as conf_file:
+        data = json.load(conf_file)
+    sigma_q = data['Filter']['sigma_q']
+    sigma_r = data['Filter']['sigma_r']
+    p_d = data['Filter']['prob_d']
+    p_s = data['Filter']['prob_s']
+
     try:
-        main()
+        main(sigma_q, sigma_r, p_d, p_s)
     except KeyboardInterrupt as e:
         print("\nGMPHD-MOOS terminated")
         pass

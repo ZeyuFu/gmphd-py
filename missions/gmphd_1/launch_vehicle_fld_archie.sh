@@ -1,3 +1,3 @@
 #!/bin/bash -e
 
-./launch_vehicle_fld.sh --vname=davis
+./launch_vehicle_fld.sh --vname=archie
