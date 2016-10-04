@@ -7,6 +7,7 @@ ProcessConfig = uFldHazardMgr
   CommsTick = 2
 
 #ifdef VNAME archie
+  swath_length = 5
   swath_width = 50
 #elseifdef VNAME betty
   swath_width = 10

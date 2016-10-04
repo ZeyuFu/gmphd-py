@@ -13,7 +13,6 @@ def inside_polygon(points, path):
     return path.contains_points(points)
 
 def rotate2D(xy, yaw=0):
-    print xy
     return np.array([xy[0]*np.cos(yaw) - xy[1]*np.sin(yaw),       # X coordinate rotation of yaw
                      xy[0]*np.sin(yaw) - xy[1]*np.cos(yaw)])      # Y coordinate rotation of yaw
 
@@ -34,5 +33,4 @@ def evaluate_sss_path(nav_status, width, length):
                        ])
     r_vertexes = np.apply_along_axis(rotate2D, 1, vertexes, nav_status[2])
     r_vertexes = r_vertexes + [nav_status[0], nav_status[1]]
-    print vertexes.shape
     return mplPath.Path(r_vertexes)

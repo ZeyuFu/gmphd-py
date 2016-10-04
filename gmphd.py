@@ -1,10 +1,13 @@
+#!/usr/bin/env python
+
 import numpy as np
 from operator import itemgetter, attrgetter
 from scipy.stats import multivariate_normal
 import math
 from matplotlib import path
-
-#!/usr/bin/env python
+import utils
+import itertools
+import copy
 # GM-PHD implementation in Python by Dan Stowell modified by Tommaso Fabbri
 #
 # Based on the description in Vo and Ma (2006).
@@ -50,8 +53,8 @@ class GmphdComponent:
         self._weight = np.float64(weight)
         self._mean = np.array(mean, dtype=np.float64)
         self._cov = np.array(cov, dtype=np.float64)
-        # self.mean.resize((self.mean.size, 1))
-        # self.cov.resize((self.mean.size, self.mean.size))
+        self._mean.resize((self._mean.size, 1))
+        self._cov.resize((self._mean.size, self._mean.size))
 
     def __repr__(self):
         str_ = '\nW:\n{0}\nM:\n{1}\nC:\n{2}\n'.format(self._weight, self._mean, self._cov)
@@ -105,23 +108,29 @@ class GMPHD:
                                ) for comp in born_components]
         return born
 
-    def predict_existing(self):
+    def predict_existing(self, nav_status, sss_path):
         # Prediction for existing targets
-        predicted = [GmphdComponent(self.survival * comp._weight,
-                                    np.dot(self.f, comp._mean),
-                                    self.q + np.dot(np.dot(self.f, comp._cov), self.f.T)
-                                    ) for comp in self.gm]
+        means = np.asarray(np.array([ comp.mean_ for comp in self.gmm]))
+        sss_path = utils.evaluate_sss_path(nav_status, width, length)  
+        gmm_mask = utils.inside_polygon(means, sss_path)
+        gmm_fov = list(itertools.compress(self.gmm, gmm_mask))
+        predicted = []
+        for idx, comp in enumerate(self.gmm):
+            if gmm_mask[i]:
+                predicted.append(GmphdComponent(self.survival * comp._weight,
+                                           np.dot(self.f, comp._mean), self.q + np.dot(np.dot(self.f, comp._cov), self.f.T))) 
+            else:
+                predicted.append(self.gmm[i])
         return predicted
 
-    def auv_update(self, measures, predicted, auv_x, auv_y, auv_heading):
-        # Construction of PHD update components
+    def auv_update(self, measures, predicted, nav_status, sss_path):
+        # Construction of  update components
         repr(predicted)
 
         eta = [np.dot(self.h, comp._mean) for comp in predicted]
-        # print 'Eta',  eta
         s = [self.r + np.dot(np.dot(self.h, comp._cov), self.h.T) for comp in predicted]
 
-        k = []
+        k = [] 
         for index, comp in enumerate(predicted):
             k.append(np.dot(np.dot(comp._cov, self.h.T), np.linalg.inv(s[index])))
 
@@ -129,12 +138,16 @@ class GMPHD:
         for index, comp in enumerate(predicted):
             pkk.append(np.dot(np.eye(np.shape(k[index])[0]) - np.dot(k[index], self.h), comp._cov))
 
-        # Update using the measures
 
-        # The 'predicted' components are kept, with a decay on the weight iff they are inside the FOV
-
-        pr_gm = [ GmphdComponent(comp._weight * (1.0 - self.detection),
-                                comp._mean, comp._cov) for comp in predicted]
+        # The 'predicted' components are kept, with a decay on the weight iff they are inside the FOV.
+        # Selection of the components inside the FOV with gmm_mask.
+        means = np.asarray(np.array([ comp.mean_ for comp in self.gmm]))
+        gmm_mask = utils.inside_polygon(means, sss_path)
+        # gmm_fov = list(itertools.compress(self.gmm, gmm_mask))
+        pr_gm = copy.deepcopy(predicted)
+        for idx, comp in enumerate(pr_gm):
+            if gmm_mask[i]:
+               pr_gm[i]._weight *= (1 - self.detection) 
 
         for i in np.ndindex(measures.shape[1]):
             z = measures[:, i]
@@ -144,7 +157,6 @@ class GMPHD:
                 # print 'ETA', eta[j].squeeze()
                 # print 'S', s[j]
                 mvn = multivariate_normal(eta[j].squeeze(), s[j])
-
                 mvn_result = mvn.pdf(z.squeeze())
 
                 temp_gm.append(GmphdComponent(
@@ -228,7 +240,7 @@ class GMPHD:
         self.gm = pruned_gm
 
     def inside_fov(self, auv_x, auv_y, auv_heading):
-
+        print("Inside FOV")
 
 def create_birth(measures):
     sigma_r = 2.0/3

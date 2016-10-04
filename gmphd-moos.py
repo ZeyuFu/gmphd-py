@@ -8,15 +8,16 @@ import re
 import numpy as np
 import gmphd
 import utils
+from threading import Semaphore
 
+measure = None
 comms = None
 f_gmphd = None
 born_components = None
-auv_nav_status = np.ndarray([0,0,0], dtype=np.float64) # [x, y, yaw]
-m _regex = re.compile('x=(?P<x>[-+]?(\d*[.])?\d+e?[-+]?\d*),'
-                      'y=(?P<y>[-+]?(\d*[.])?\d+e?[-+]?\d*),label=(?P<label>\d*),'
-                      'type=(?P<type>benign|hazard)')
- 
+auv_nav_status = np.array([0,0,0], dtype=np.float64) # [x, y, yaw]
+
+m_regex = re.compile('x=(?P<x>[-+]?(\d*[.])?\d+e?[-+]?\d*),y=(?P<y>[-+]?(\d*[.])?\d+e?[-+]?\d*),label=(?P<label>\d*),type=(?P<type>benign|hazard)')
+msgs_semaphore = Semaphore()
 
 def on_connect():
     global comms
@@ -27,28 +28,26 @@ def on_connect():
     return True
 
 def on_mail():
-    global auv_nav_status
-
+    global auv_nav_status, measure
     msgs = comms.fetch()
+    msgs_semaphore.acquire()
     for i in reversed(range(len(msgs))):
-        if msgs[i].name() == 'UHZ_HAZARD_REPORT':
-            g = m_regex.match(msgs[i].string())
-            print('X={0},Y={1},L={2},T={3}'.format(g.group('x'), g.group('y'),
-                                                   g.group('label'), g.group('type')))
-            if g.group('type') == 'hazard':
-                measure = np.array([np.float64(g.group('x')), np.float64(g.group('y'))])
-                measure.shape = (measure.size, 1)
-                on_measures(measure)
-        if msgs[i].name() == 'NAV_X':
-            nav_x = np.float64(msgs[i].string())
-            auv_nav_status[0] = nav_x
-        if msgs[i].name() == 'NAV_Y':
-            nav_y = np.float64(msgs[i].string())
-            auv_nav_status[1] = nav_y
-        if msgs[i].name() == 'NAV_YAW':
-            nav_yaw = np.float64(msgs[i].string())
-            auv_nav_status[2] = nav_yaw
-
+        if not msgs[i].string():
+            if msgs[i].name() == 'UHZ_HAZARD_REPORT':
+                g = m_regex.match(msgs[i].string())
+                print('X={0},Y={1},L={2},T={3}'.format(g.group('x'), g.group('y'),
+                                                       g.group('label'), g.group('type')))
+                if g.group('type') == 'hazard':
+                    measure = np.array([np.float64(g.group('x')), np.float64(g.group('y'))])
+                    measure.shape = (measure.size, 1)
+                    # on_measures(measure)
+            if msgs[i].name() == 'NAV_X':
+                auv_nav_status[0] = msgs[i].double()
+            if msgs[i].name() == 'NAV_Y':
+                auv_nav_status[1] = msgs[i].double()
+            if msgs[i].name() == 'NAV_YAW':
+                auv_nav_status[2] = msgs[i].double()
+    msgs_semaphore.release()
     return True
 
 
@@ -90,9 +89,11 @@ def main(_sigma_q, _sigma_r, _p_d, _p_s):
     comms.set_on_connect_callback(on_connect)
     comms.set_on_mail_callback(on_mail)
     comms.run('localhost', 9001, 'gmphd-moos')
-
+    i = 0
     while True:
-        time.sleep(1.0)
+        i = i + 1
+        # print(i)
+        time.sleep(.01)
 
 if __name__ == "__main__":
     with open('filter-conf.json') as conf_file:
