@@ -57,7 +57,7 @@ class GmphdComponent:
         self._cov.resize((self._mean.size, self._mean.size))
 
     def __repr__(self):
-        str_ = '\nW:\n{0}\nM:\n{1}\nC:\n{2}\n'.format(self._weight, self._mean, self._cov)
+        str_ = 'W: {0} M: {1} C: {2}'.format(self._weight, self._mean.tolist(), self._cov.tolist())
         return str_
 
 
@@ -110,52 +110,71 @@ class GMPHD:
 
     def predict_existing(self, nav_status, sss_path):
         # Prediction for existing targets
-        means = np.asarray(np.array([ comp.mean_ for comp in self.gmm]))
-        sss_path = utils.evaluate_sss_path(nav_status, width, length)  
-        gmm_mask = utils.inside_polygon(means, sss_path)
-        gmm_fov = list(itertools.compress(self.gmm, gmm_mask))
-        predicted = []
-        for idx, comp in enumerate(self.gmm):
-            if gmm_mask[i]:
-                predicted.append(GmphdComponent(self.survival * comp._weight,
-                                           np.dot(self.f, comp._mean), self.q + np.dot(np.dot(self.f, comp._cov), self.f.T))) 
-            else:
-                predicted.append(self.gmm[i])
+        if len(self.gm) == 0:
+            return []
+        means = np.asarray(np.array([ comp._mean for comp in self.gm]))
+        means = np.squeeze(means)
+        means = np.squeeze(means)
+        means = np.reshape(means, (means.size / 2, 2))
+        if len(means) > 0:
+            gmm_mask = utils.inside_polygon(means, sss_path)
+            gmm_fov = list(itertools.compress(self.gm, gmm_mask))
+            predicted = []
+            for idx, comp in enumerate(self.gm):
+                if gmm_mask[idx]:
+                    predicted.append(GmphdComponent(self.survival * comp._weight,
+                                               np.dot(self.f, comp._mean), self.q + np.dot(np.dot(self.f, comp._cov), self.f.T))) 
+                else:
+                    predicted.append(self.gm[idx])
         return predicted
 
-    def auv_update(self, measures, predicted, nav_status, sss_path):
-        # Construction of  update components
-        repr(predicted)
+    def auv_update(self, measures, nav_status, sss_path):
+        '''
+            Construction of the update components
+            s   = R + H * _Cov * H.T 
+            eta = H * _Mean
+            K = _Cov * H.T * ( H * _Cov * H.T + R) ^ -1 
+            Pkk = ( I - K * H ) * _Cov
+        '''
+        if len(self.gm) == 0:
+           return 
 
-        eta = [np.dot(self.h, comp._mean) for comp in predicted]
-        s = [self.r + np.dot(np.dot(self.h, comp._cov), self.h.T) for comp in predicted]
+        eta = [np.dot(self.h, comp._mean) for comp in self.gm]
+        s = [self.r + np.dot(np.dot(self.h, comp._cov), self.h.T) for comp in self.gm]
 
         k = [] 
-        for index, comp in enumerate(predicted):
+        for index, comp in enumerate(self.gm):
             k.append(np.dot(np.dot(comp._cov, self.h.T), np.linalg.inv(s[index])))
 
         pkk = []
-        for index, comp in enumerate(predicted):
+        for index, comp in enumerate(self.gm):
             pkk.append(np.dot(np.eye(np.shape(k[index])[0]) - np.dot(k[index], self.h), comp._cov))
 
+        '''
+            The predicted components are kept with a decay (1 - Pd) iff they are inside the FOV, contained into pr_gm
+        '''
 
-        # The 'predicted' components are kept, with a decay on the weight iff they are inside the FOV.
-        # Selection of the components inside the FOV with gmm_mask.
-        means = np.asarray(np.array([ comp.mean_ for comp in self.gmm]))
+        # Extraction of the coordinates of the components inside the RFS 
+        means = np.asarray(np.array([ comp._mean for comp in self.gm]))
+        means = np.squeeze(means)
+        means = np.reshape(means, (means.size / 2, 2))
+        # Temp copy of the RFS after the prediction step
+        pr_gm = copy.deepcopy(self.gm) 
+        # Mask of the components inside the FOV
         gmm_mask = utils.inside_polygon(means, sss_path)
+        
+        # print(gmm_mask.shape, pr_gm)  
+
         # gmm_fov = list(itertools.compress(self.gmm, gmm_mask))
-        pr_gm = copy.deepcopy(predicted)
         for idx, comp in enumerate(pr_gm):
-            if gmm_mask[i]:
-               pr_gm[i]._weight *= (1 - self.detection) 
+            if gmm_mask[idx]:
+               pr_gm[idx]._weight *= (1 - self.detection) 
 
         for i in np.ndindex(measures.shape[1]):
             z = measures[:, i]
             temp_gm = []
-            for j, comp in enumerate(predicted):
-                # print "Z", z.squeeze()
-                # print 'ETA', eta[j].squeeze()
-                # print 'S', s[j]
+            for j, comp in enumerate(self.gm):
+                # Computation of q_k
                 mvn = multivariate_normal(eta[j].squeeze(), s[j])
                 mvn_result = mvn.pdf(z.squeeze())
 
@@ -166,11 +185,13 @@ class GMPHD:
 
             # The Kappa thing (clutter and reweight)
             weight_sum = np.sum(comp._weight for comp in temp_gm)
-            if weight_sum != 0:
+            
+            if weight_sum >= 1e-9:
                 weight_factor = 1.0 / (self.clutter + weight_sum)
                 for comp in temp_gm:
                     comp._weight *= weight_factor
                 pr_gm.extend(temp_gm)
+
         self.gm = pr_gm
 
     def run_iteration(self, measures, born_components):
@@ -189,14 +210,15 @@ class GMPHD:
         self.prune()
         print('Pruning: '.format(self.gm))
 
-    def run_auv_iteration(self, measures, born_components, auv_x, auv_y, swath_w, swath_l):
-        pr_born = self.predict_birth(born_components)
+    def run_auv_iteration(self, measures, born_components, nav_status, swath_w, swath_l):
+        # pr_born = self.predict_birth(born_components)
+        sss_path = utils.evaluate_sss_path(nav_status, swath_w, swath_l)  
+      
+        predicted = self.predict_existing(nav_status, sss_path)
+        predicted.extend(born_components)
+        self.gm = predicted
 
-        predicted = self.predict_existing()
-        predicted.extend(pr_born)
-
-        self.update(measures, predicted)
-
+        self.auv_update(measures, nav_status, sss_path)
         self.prune()
 
 
@@ -214,33 +236,33 @@ class GMPHD:
             j = np.argmax(i._weight for i in I)
             L = []
             indexes = []
+            # Loop for compute the Mahalanobis distance among the components survived the trunctation step 
             for index, i in enumerate(I):
                 temp = np.dot((i._mean - I[j]._mean).T, np.linalg.inv(i._cov))
                 mah_dist = np.float64(np.dot(temp, (i._mean - I[j]._mean)))
                 if mah_dist <= merge_thresh:
                     L.append(i)
                     indexes.append(index)
+            # L contains the components with Mahalanobis distance greater than merge_thresh 
+            # between component j and the others         
             temp_weight = np.sum([i._weight for i in L])
             temp_mean = (1.0 / temp_weight) * np.sum([i._weight * i._mean for i in L], axis=0)
             temp_cov = np.zeros((temp_mean.size, temp_mean.size))
-
             for i in L:
-                print 'TM', temp_mean
-                print i._mean
+                # print 'TM', temp_mean.tolist()
+                # print i._mean.tolist()
                 temp_cov += (i._cov + np.dot((temp_mean - i._mean).T, (temp_mean - i._mean)))
+                
             pruned_gm.append(GmphdComponent(temp_weight, temp_mean, temp_cov))
             I = [i for j, i in enumerate(I) if j not in indexes]
         pruned_gm.sort(key=attrgetter('_weight'))
         pruned_gm.reverse()
         pruned_gm = pruned_gm[:max_components]
-        temp_sum_1 = np.sum(i._weight for i in pruned_gm)
-        for i in pruned_gm:
-            i._weight *= temp_sum_0 / temp_sum_1
-
+        # temp_sum_1 = np.sum(i._weight for i in pruned_gm)
+        # for i in pruned_gm:
+        #     i._weight *= temp_sum_0 / temp_sum_1
         self.gm = pruned_gm
 
-    def inside_fov(self, auv_x, auv_y, auv_heading):
-        print("Inside FOV")
 
 def create_birth(measures):
     sigma_r = 2.0/3

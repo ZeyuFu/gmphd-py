@@ -10,6 +10,7 @@ def inside_polygon(points, path):
     points -- numpy array containing the coordinates of the points
     path -- matplotlib.path describing the vertex of the polygon
     """
+    #print(points.shape, points.tolist())
     return path.contains_points(points)
 
 def rotate2D(xy, yaw=0):
@@ -33,4 +34,5 @@ def evaluate_sss_path(nav_status, width, length):
                        ])
     r_vertexes = np.apply_along_axis(rotate2D, 1, vertexes, nav_status[2])
     r_vertexes = r_vertexes + [nav_status[0], nav_status[1]]
+    #print(r_vertexes)
     return mplPath.Path(r_vertexes)
