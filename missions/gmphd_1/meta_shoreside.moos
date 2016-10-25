@@ -117,12 +117,11 @@ ProcessConfig = uFldHazardSensor
   sensor_config = width=25, exp=4, pclass=0.63
   sensor_config = width=50, exp=2, pclass=0.55
 
-  swath_length  = 5
-
   default_hazard_shape = triangle
   default_benign_shape = square
 
-  min_classify_interval = 30
+  min_classify_interval = 0
+  swath_length = 5
   min_reset_interval    = 100000
 
   swath_transparency = 0.35

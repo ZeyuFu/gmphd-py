@@ -1,5 +1,4 @@
 #!/usr/bin/python
-
 import pymoos
 import json
 import time
@@ -28,7 +27,7 @@ def on_connect():
     comms.register('NAV_Y'            , 0)
     comms.register('NAV_YAW'          , 0)
     comms.register('UHZ_DETECTION_REPORT', 0)
-    #comms.register('UHZ_HAZARD_REPORT', 0)
+    comms.register('UHZ_HAZARD_REPORT', 0)
     return True
 
 def on_mail():
@@ -41,16 +40,22 @@ def on_mail():
             #g = m_regex.match(msgs[i].string())
             g = d_regex.match(msgs[i].string())
             
-            # print('X={0},Y={1},L={2},T={3}'.format(g.group('x'), g.group('y'),
-            #                                       g.group('label'), g.group('type')))
-            print('X={0},Y={1},L={2}'.format(g.group('x'), g.group('y'),
-                                                   g.group('label')))
+            # print('X={0},Y={1},L={2}'.format(g.group('x'), g.group('y'),
+            #                                       g.group('label')))
 
-            #if g.group('type') == 'hazard':
             measure = np.array([np.float64(g.group('x')), np.float64(g.group('y'))])
             measure.shape = (measure.size, 1)
             # print(measure)
-            on_measures(measure)
+            # comms.notify("UHZ_CLASSIFY_REQUEST", "vname=archie, label={0}, priority=85".format(g.group('label')))
+            # on_measures(measure)
+        if msgs[i].name() == 'UHZ_HAZARD_REPORT':
+            g = m_regex.match(msgs[i].string())
+            if g.group('type') == 'hazard':
+                print('X={0},Y={1},L={2},T={3}'.format(g.group('x'), g.group('y'),
+                                                   g.group('label'), g.group('type')))
+                measure = np.array([np.float64(g.group('x')), np.float64(g.group('y'))])
+                measure.shape = (measure.size, 1)
+                on_measures(measure) 
         if msgs[i].name() == 'NAV_X':
             auv_nav_status[0] = msgs[i].double()
         if msgs[i].name() == 'NAV_Y':
@@ -67,7 +72,7 @@ def on_measures(measure):
     born_components = gmphd.create_birth(measure)
     print('Born components: {0}'.format(born_components))
     for comp in f_gmphd.gm:
-        print('\t',comp)
+        print(comp)
 
 
 def main(_sigma_q, _sigma_r, _p_d, _p_s):
@@ -87,19 +92,17 @@ def main(_sigma_q, _sigma_r, _p_d, _p_s):
     p_s = _p_s
 
     clutter_intensity = 0
-
     born_components = []
-
+    
     f_gmphd = gmphd.GMPHD([], p_s, p_d, F, Q, H, R, clutter_intensity)
 
     comms.set_on_connect_callback(on_connect)
     comms.set_on_mail_callback(on_mail)
     comms.run('localhost', 9001, 'gmphd-moos')
-    i = 0
     while True:
-        i = i + 1
-        time.sleep(.1)
-        # print(auv_nav_status)
+        time.sleep(.01)
+
+
 if __name__ == "__main__":
     with open('filter-conf.json') as conf_file:
         data = json.load(conf_file)
